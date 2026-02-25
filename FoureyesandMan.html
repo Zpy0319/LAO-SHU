@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>四眼与牢大 · 1.2.6</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            background-color: #1a2a32; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .game-container {
+            width: 100%; max-width: 1200px; height: 100%;
+            background-color: #000; border-radius: 20px; overflow: hidden;
+            position: relative; box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+        }
+        
+        /* 背景层 */
+        .bg-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-size: cover; background-position: center;
+            background-repeat: no-repeat; z-index: 1;
+            filter: brightness(0.95) saturate(1.1);
+        }
+        
+        /* 角色层 - 确保显示 */
+        .characters {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 5; pointer-events: none;
+        }
+        .character {
+            position: absolute; bottom: 5%; height: 75%; max-height: 500px;
+            object-fit: contain; object-position: bottom;
+            filter: drop-shadow(0 10px 6px rgba(0,0,0,0.3));
+            transition: opacity 0.3s ease;
+            opacity: 1; /* 确保显示 */
+        }
+        .character.left { left: 15%; }
+        .character.right { right: 15%; }
+        
+        /* 对话框 */
+        .dialog-panel {
+            position: absolute; bottom: 16px; left: 20px; right: 20px;
+            background: rgba(128, 0, 128, 0.3); backdrop-filter: blur(8px);
+            border-radius: 24px; border: 2px solid #e4d5c0;
+            box-shadow: 0 6px 0 #5f4b3a, 0 10px 20px rgba(0,0,0,0.5);
+            padding: 16px 24px 18px 24px; z-index: 20;
+            color: #f7f2e9; cursor: pointer;
+        }
+        .nameplate {
+            display: inline-block; background-color: #c49a6c; border-radius: 40px;
+            padding: 6px 18px; margin-bottom: 8px; border: 2px solid #eedcc9;
+            box-shadow: 0 3px 0 #7b5e45; font-weight: bold; font-size: 1.2rem;
+            color: #1e1a16; text-shadow: 1px 1px 0 #e0cbb4;
+        }
+        .message-text {
+            font-size: 1.25rem; line-height: 1.6; min-height: 4.2rem;
+            word-break: break-word; text-shadow: 2px 2px 2px #1a1310;
+            padding-right: 30px; font-family: 'Noto Serif SC', serif;
+            color: #ffffff;
+        }
+        .next-indicator {
+            position: absolute; bottom: 20px; right: 30px; font-size: 1.8rem;
+            color: #ecd7b4; animation: pulse 1.2s infinite; opacity: 0.7;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.5; transform: translateX(0); }
+            50% { opacity: 1; transform: translateX(6px); }
+            100% { opacity: 0.5; transform: translateX(0); }
+        }
+        
+        /* 右上角控制栏 - 确保显示 */
+        .top-controls {
+            position: absolute; top: 16px; right: 20px; z-index: 35;
+            display: flex; gap: 8px; background: rgba(20, 10, 20, 0.8);
+            backdrop-filter: blur(8px); border-radius: 40px;
+            padding: 6px 16px; border: 2px solid #cfa57b;
+            box-shadow: 0 4px 0 #4f3a28; align-items: center;
+        }
+        .top-btn {
+            background: #2f2820; border: 2px solid #cfb594; color: #f0dbc0;
+            border-radius: 40px; width: 38px; height: 38px; font-size: 20px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; box-shadow: 0 3px 0 #524433;
+            transition: transform 0.1s ease;
+        }
+        .top-btn:active { transform: translateY(4px); box-shadow: none; }
+        .volume-slider {
+            width: 80px; height: 6px; -webkit-appearance: none;
+            background: #d4b28c; border-radius: 10px; outline: none;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 18px; height: 18px;
+            border-radius: 50%; background: #ffe4b5; border: 2px solid #9b7e5c;
+            cursor: pointer;
+        }
+        .music-status { font-size: 1.2rem; color: #ffefd5; margin-left: 4px; }
+        
+        /* 历史回溯面板 */
+        .history-panel {
+            position: absolute; top: 80px; left: 20px; width: 300px; max-height: 70%;
+            background: rgba(20,10,20,0.95); backdrop-filter: blur(10px);
+            border: 3px solid #cfa57b; border-radius: 24px; padding: 16px;
+            z-index: 200; color: #f0e0c0; overflow-y: auto; display: none;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.7);
+        }
+        .history-panel.show { display: block; }
+        .history-item {
+            display: flex; align-items: center; gap: 8px; padding: 8px;
+            border-bottom: 1px solid #7b5e45; cursor: pointer; transition: 0.1s;
+        }
+        .history-item:hover { background: #5f3a2a; }
+        .history-speaker { font-weight: bold; color: #ffd7a0; min-width: 60px; }
+        .history-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .close-history { text-align: right; font-size: 1.8rem; cursor: pointer; color: #ffb347; margin-bottom: 8px; }
+        
+        /* 片尾字幕 */
+        .credits-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; color: #fff; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 100;
+            opacity: 0; visibility: hidden; transition: opacity 0.8s ease;
+        }
+        .credits-container.show { visibility: visible; opacity: 1; }
+        .credit-line { font-size: 4vh; line-height: 2; text-align: center; white-space: nowrap; }
+        
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .game-container { border-radius: 0; }
+            .character { height: 65%; }
+            .character.left { left: 8%; }
+            .character.right { right: 8%; }
+            .dialog-panel { bottom: 10px; left: 10px; right: 10px; padding: 12px 16px; }
+            .top-controls { top: 10px; right: 10px; padding: 4px 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container" id="gameContainer">
+        <!-- 背景图层 -->
+        <div class="bg-layer" id="bgImage"></div>
+        
+        <!-- 角色层 -->
+        <div class="characters">
+            <img class="character left" id="charLeft" alt="四眼">
+            <img class="character right" id="charRight" alt="牢大">
+        </div>
+        
+        <!-- 对话框 -->
+        <div class="dialog-panel" id="dialogBox">
+            <div class="nameplate" id="speakerName">旁白</div>
+            <div class="message-text" id="messageText">正在加载游戏内容...</div>
+            <div class="next-indicator">▼</div>
+        </div>
+        
+        <!-- 右上角控制栏 -->
+        <div class="top-controls">
+            <div class="top-btn" id="historyBtn" title="历史回溯">📜</div>
+            <div class="top-btn" id="fastForwardBtn" title="快进">⏩</div>
+            <div class="top-btn" id="resetBtn" title="重置">↻</div>
+            <div class="top-btn" id="musicPlayPause" title="播放/暂停">▶️</div>
+            <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.01" value="0.5">
+            <span class="music-status" id="musicStatus">🎵</span>
+            <div class="top-btn" id="nextBtnSmall" title="下一句">▶</div>
+        </div>
+        
+        <!-- 历史回溯面板 -->
+        <div class="history-panel" id="historyPanel">
+            <div class="close-history" id="closeHistory">✖</div>
+            <div id="historyList">暂无历史记录</div>
+        </div>
+        
+        <!-- 片尾字幕 -->
+        <div class="credits-container" id="creditsContainer">
+            <div class="credit-line">LOVE END</div>
+            <div class="credit-line">感谢游玩</div>
+            <div class="credit-line">Foureyes and Man</div>
+            <div class="credit-line">曼巴光影集团荣誉出品</div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+            
+            // ========== 游戏状态 ==========
+            let currentIndex = 0;
+            let currentBg = 'classroom';
+            let historyMessages = [];
+            let fastForwardActive = false;
+            let fastForwardTimer = null;
+            let currentAudio = null;
+            let currentMusicPath = '';
+            
+            // ========== DOM元素 ==========
+            const elements = {
+                gameContainer: document.getElementById('gameContainer'),
+                bgImage: document.getElementById('bgImage'),
+                charLeft: document.getElementById('charLeft'),
+                charRight: document.getElementById('charRight'),
+                speakerName: document.getElementById('speakerName'),
+                messageText: document.getElementById('messageText'),
+                dialogBox: document.getElementById('dialogBox'),
+                historyBtn: document.getElementById('historyBtn'),
+                fastForwardBtn: document.getElementById('fastForwardBtn'),
+                resetBtn: document.getElementById('resetBtn'),
+                musicPlayPause: document.getElementById('musicPlayPause'),
+                volumeSlider: document.getElementById('volumeSlider'),
+                musicStatus: document.getElementById('musicStatus'),
+                nextBtnSmall: document.getElementById('nextBtnSmall'),
+                creditsContainer: document.getElementById('creditsContainer'),
+                historyPanel: document.getElementById('historyPanel'),
+                historyList: document.getElementById('historyList'),
+                closeHistory: document.getElementById('closeHistory')
+            };
+            
+            // ========== 剧本数据（完整15行示例） ==========
+            const messages = [
+                { type: 'bg', bg: 'classroom' },
+                { speaker: '旁白', text: '午后的阳光透过蓝色窗帘，在黄、蓝、绿三色交错的课桌上投下温暖的光斑。储物柜的玻璃门反射着柔和的光，空荡的教室只有尘埃在光束中缓缓起舞。四眼坐在靠窗的位置，白色短袖Polo衫的黑色镶边在光线下格外清晰，他低头看着摊开的诗集，镜片后的眼睛专注而温柔。' },
+        { speaker: '四眼', text: '（指尖轻抚书页，低声自语）“六月的风绕过屋檐时，连时光都放慢了脚步……这句真好。”' },
+        { speaker: '旁白', text: '（教室门被轻轻推开，铰链发出细微的声响）' },
+        { speaker: '牢大', text: '（怀抱两本笔记，脚步轻快地走进）四眼！我就知道你还没走。', action: 'happy' },
+        { speaker: '四眼', text: '（抬头，眼镜微微反光）牢大？值日已经做完了吗？' },
+        { speaker: '牢大', text: '（走到他前排座位，转身坐下，黑白格子的裙摆轻轻展开）当然啦！看到教室灯还亮着就猜到是你。（目光落在他手中的诗集）又在读诗？' },
+        { speaker: '四眼', text: '（小心地合上书）嗯……放学后的教室特别安静，很适合读这些文字。' },
+        { speaker: '牢大', text: '（环顾四周，手指划过蓝色桌面）因为很温暖呀。彩色的桌子、蓝色的窗帘，还有阳光。（指向窗外）你看，窗外的树叶都在发光呢。' },
+        { speaker: '四眼', text: '（顺着她手指望去）像撒了一层金粉。（转回头，微笑）你总是能发现这些美好的细节。' },
+        { speaker: '牢大', text: '（托着下巴，眼睛弯成月牙）那是因为和你在一起时，连最普通的东西都变得特别起来。（忽然想起什么）对了！上周答应我的事，没忘记吧？' },
+        { speaker: '四眼', text: '（一愣，随即恍然）啊！是说要把诗集里最喜欢的句子抄给你？' },
+        { speaker: '牢大', text: '（用力点头，长发随之轻晃）说好的“珍藏版”哦！我可是每天都有在期待呢。', action: 'happy' },
+        { speaker: '四眼', text: '（从书包里取出浅蓝色信封，耳根微红）其实……昨晚就准备好了。', action: 'shy' },
+        { speaker: '牢大', text: '（惊喜地接过信封）真的吗？我现在可以看吗？', action: 'surprised' },
+        { speaker: '四眼', text: '（点头，手指无意识地摩挲书脊）嗯……选了一句我觉得最像你的。' },
+        { speaker: '旁白', text: '（牢大小心拆开信封，抽出信纸，上面是工整清秀的字迹）' },
+        { speaker: '牢大', text: '（轻声念出）“你的笑容是清晨第一缕穿过百叶窗的光，让沉睡的露珠都开始哼唱……”（声音渐小，脸颊泛起淡淡红晕）', action: 'shy' },
+        { speaker: '四眼', text: '（紧张地推了推眼镜）那个……是不是太直白了？我只是觉得，每次你笑起来，整个教室都好像亮了一点……', action: 'shy' },
+        { speaker: '牢大', text: '（抬起头，眼中映着窗外的光）像什么？' },
+        { speaker: '四眼', text: '（深吸一口气）像春天突然提前到来，连空气都变得甜了起来。' },
+        { speaker: '旁白', text: '（教室陷入短暂的安静，只有远处隐约传来的操场喧哗）' },
+        { speaker: '牢大', text: '（将信纸轻轻按在胸口，声音软软的）四眼，你知道吗……你说这种话的时候，我的心脏会跳得特别快。', action: 'shy' },
+        { speaker: '四眼', text: '（慌乱地移开视线）对不起！我是不是太唐突了……', action: 'shy' },
+        { speaker: '牢大', text: '（扑哧一笑）笨蛋，我又没说不喜欢。（小心地将信纸折好）这个，我会放在日记本的第一页。', action: 'happy' },
+        { speaker: '四眼', text: '（松了口气，笑容放松）那……下次我找到更美的句子，再抄给你。' },
+        { speaker: '牢大', text: '不过不能只让我单方面收礼物哦。（从裙子的侧袋掏出白色MP3）这个，给你。' },
+        { speaker: '四眼', text: '（惊讶地接过）这是……', action: 'surprised' },
+        { speaker: '牢大', text: '（按下播放键，轻快的钢琴前奏流淌而出）你上次说想听我喜欢的音乐，我把它们都存进去啦。（眼神温柔）有轻快的，有温柔的，还有几首带着雨声的……每次听到这些旋律，我都会想起和你一起在教室度过的午后。' },
+        { speaker: '四眼', text: '（仔细端详手中的MP3）牢大……' },
+        { speaker: '牢大', text: '（俏皮地眨眨眼）要好好听哦！尤其是第七首，是我最近单曲循环的。', action: 'happy' },
+        { speaker: '四眼', text: '（戴上一边耳机）这是……有风铃的声音？' },
+        { speaker: '牢大', text: '（自然地凑近，分享同一只耳机）嗯！叫《风与云的对话》，像不像现在窗外风吹过树叶的声音？', move: 'closer' },
+        { speaker: '四眼', text: '（闭上眼聆听）更像……你说话时声音里那种轻盈的起伏。' },
+        { speaker: '牢大', text: '（脸一红，轻拍他手臂）你最近是不是背了太多情诗呀？', action: 'shy' },
+        { speaker: '四眼', text: '（睁开眼，认真地看着她）是因为你，这些诗句才有了生命。' },
+        { speaker: '旁白', text: '（阳光悄悄移动，将两人的影子投在蓝色地面上，边缘柔和地交融）' },
+        { speaker: '牢大', text: '（手指缠绕着耳机线）四眼，你觉得……喜欢一个人是什么感觉？' },
+        { speaker: '四眼', text: '（微微一怔，思考片刻）像是……原本黑白的世界突然有了颜色。（看向她）原本普通的教室，因为你在，变成了特别的地方；原本普通的午后，因为你在，变成了值得珍藏的时光。' },
+        { speaker: '牢大', text: '（低头摆弄MP3，声音很轻）那……你现在看到的世界，是什么颜色？' },
+        { speaker: '四眼', text: '（微笑）是彩虹糖洒在阳光里的颜色。（顿了顿）尤其是你眼睛里的颜色。' },
+        { speaker: '牢大', text: '（抬起头，眼眶微微发亮）四眼，你知不知道你这样说话……真的很犯规。', action: 'shy' },
+        { speaker: '四眼', text: '（鼓起勇气）那……我可以继续说吗？' },
+        { speaker: '牢大', text: '（轻轻点头，手指无意识地卷着发梢）嗯。' },
+        { speaker: '四眼', text: '（深吸一口气）你走路时裙摆扬起的弧度，你思考时微微偏头的模样，你听到喜欢的旋律时脚尖轻轻打拍子的习惯……所有这些，都在我的心里变成了诗。' },
+        { speaker: '牢大', text: '（将脸埋在臂弯里，声音闷闷的）不行了……再听下去我的脸要烧起来了。', action: 'shy' },
+        { speaker: '四眼', text: '（轻声笑）那我不说了。（递过另一边耳机）一起听完整首歌好吗？' },
+        { speaker: '牢大', text: '（抬起头，接过耳机戴上）嗯。' },
+        { speaker: '旁白', text: '（两人肩并肩坐着，共享着同一段旋律。窗外的麻雀落在窗台，好奇地歪头看着教室里这对少年少女）' },
+        { speaker: '牢大', text: '（随着音乐轻轻哼唱，脚尖在地板上轻点）四眼。', action: 'happy' },
+        { speaker: '四眼', text: '嗯？' },
+        { speaker: '牢大', text: '文化祭的“诗词咖啡厅”，我们真的能做好吗？我有点紧张……', action: 'shy' },
+        { speaker: '四眼', text: '（摘下耳机，认真地看着她）一定可以。你负责给每杯“诗饮”配上最甜的笑容，我负责把每一句诗变成温暖的文字。（语气温柔）而且班长说，我们可以布置一个特别的角落。' },
+        { speaker: '牢大', text: '（眼睛一亮）什么角落？', action: 'surprised' },
+        { speaker: '四眼', text: '“心声投递站”。准备浅蓝色信纸和信封，让客人写下想对某人说的话，或者喜欢的诗句。（眼神闪烁）活动结束后，我们一起整理这些心意，帮他们传递……或者回信。' },
+        { speaker: '牢大', text: '（双手合十）好浪漫！像是我们在编织一张看不见的网，连接所有人的心情。', action: 'happy' },
+        { speaker: '四眼', text: '（轻声）就像你连接了我所有的喜怒哀乐。' },
+        { speaker: '牢大', text: '（沉默片刻，忽然起身）四眼，闭上眼睛。' },
+        { speaker: '四眼', text: '（疑惑）诶？' },
+        { speaker: '牢大', text: '（伸出手掌）快点啦，给你一个小惊喜。' },
+        { speaker: '旁白', text: '（四眼顺从地闭上眼睛。牢大从书包里拿出一个小小的玻璃瓶，里面装着折成星星的彩色纸条）' },
+        { speaker: '牢大', text: '（将玻璃瓶放在他掌心）可以睁开啦。' },
+        { speaker: '四眼', text: '（睁开眼，惊讶地看着手中的瓶子）这是……', action: 'surprised' },
+        { speaker: '牢大', text: '（脸颊微红）每天想你的时候，就写一张纸条折成星星。（声音越来越小）本来想折满一百颗再给你的……但今天特别想让你知道。', action: 'shy' },
+        { speaker: '四眼', text: '（轻轻晃动瓶子，星星们发出细微的沙沙声）里面写的都是……' },
+        { speaker: '牢大', text: '（急忙摆手）不准现在看！要等……等我们都毕业了才能拆开。', action: 'shy' },
+        { speaker: '四眼', text: '（将瓶子小心地握在手心）好。（停顿）那我也有个约定。' },
+        { speaker: '牢大', text: '嗯？' },
+        { speaker: '四眼', text: '从今天开始，每天为你写一句诗，写在浅蓝色的信纸上。（微笑）等文化祭结束那天，一起送给你。' },
+        { speaker: '牢大', text: '（眼睛湿润）那……拉钩？' },
+        { speaker: '四眼', text: '（伸出小指）拉钩。' },
+        { speaker: '旁白', text: '（两人的小指勾在一起，阳光将他们的影子拉得很长很长）' },
+        { speaker: '旁白', text: '教室里的时钟指向五点，阳光开始染上橙黄。储物柜的玻璃映出少年少女靠在一起的轮廓，彩色课桌像是沉默的见证者。这个平凡的午后，因为一句诗、一首歌、一瓶星星和一个约定，变成了永不褪色的记忆。' },
+
+        // 场景二：走廊下层 (图4)
+        { type: 'bg', bg: 'corridor1' },
+        { speaker: '旁白', text: '放学后的走廊空旷而宁静。灰蓝色的地面光滑如镜，映出天花板的白色灯光。左侧墙壁上整齐排列着深色门框的教室门，每扇门旁都挂着宣传栏；右侧是浅棕色瓷砖墙面，黑色金属栏杆外，绿植在微风中轻轻摇曳。走廊尽头的光格外明亮，仿佛通往另一个世界。' },
+        { speaker: '牢大', text: '（走在前面，白色中筒袜随着步伐轻轻摩擦）四眼，跟紧哦！带你去我的“秘密基地”。', action: 'happy' },
+        { speaker: '四眼', text: '（快步跟上，目光扫过墙上的宣传画）不是说要直接回家吗？' },
+        { speaker: '牢大', text: '（在走廊拐角停下，转身，百褶裙划出优美弧线）就在前面！（指着走廊尽头的明亮处）从那里看夕阳，整个学校都会变成金色。' },
+        { speaker: '四眼', text: '（望向远处）那里……是通往天台的门吗？' },
+        { speaker: '牢大', text: '（神秘地摇头）比天台更特别。（伸出手）来，抓紧我的手。' },
+        { speaker: '四眼', text: '（迟疑片刻，轻轻握住她的手）牢大……', action: 'shy' },
+        { speaker: '牢大', text: '（自然地牵着他往前走）放心啦，不是做什么坏事。（声音轻快）只是想让四眼也看看，我眼中最美丽的风景。' },
+        { speaker: '旁白', text: '（两人走到走廊尽头，那里有一扇向外凸出的落地窗，窗外是开阔的校园景色）' },
+        { speaker: '四眼', text: '（惊讶地睁大眼睛）这里是……', action: 'surprised' },
+        { speaker: '牢大', text: '（松开手，双手张开靠在窗玻璃上）是音乐教室外面的观景角！很少有人发现这里。（转身背靠窗户）你看，从这个角度，能看到整个中庭和远处的教学楼。' },
+        { speaker: '四眼', text: '（走到她身边，望向窗外）真的……好开阔。' },
+        { speaker: '牢大', text: '（侧头看他，夕阳为她镀上金边）我心情不好的时候就会来这里。看着云慢慢飘，听着远处隐约的钢琴声……（声音轻柔）然后就会想，要是四眼也在就好了。' },
+        { speaker: '四眼', text: '（心口一暖）以后……我随时都可以陪你。' },
+        { speaker: '牢大', text: '（甜甜一笑）那说定啦！（指向窗外）你看那边，三年级那栋楼的钟楼，每到整点就会响。', action: 'happy' },
+        { speaker: '四眼', text: '现在好像快六点了。（看向手表）还有三分钟。' },
+        { speaker: '牢大', text: '（眼睛亮起来）那我们等钟声好不好？这里的回音特别美。', action: 'happy' },
+        { speaker: '四眼', text: '（点头）好。' },
+        { speaker: '旁白', text: '（两人并肩靠在窗边，夕阳将他们的影子投在灰蓝色地面上，拉得很长）' },
+        { speaker: '牢大', text: '（轻声）四眼，你有过特别特别想要留住某个瞬间的时候吗？' },
+        { speaker: '四眼', text: '（思考片刻）有。（转头看她）比如现在。' },
+        { speaker: '牢大', text: '（脸微红）我是说……那种感觉。明明是很普通的场景，却因为某种原因，变得珍贵得让人想哭。', action: 'shy' },
+        { speaker: '四眼', text: '（认真地看着她）每次你对我笑的时候，就是那种感觉。' },
+        { speaker: '牢大', text: '（将脸转向窗外）你又在说这种话……', action: 'shy' },
+        { speaker: '四眼', text: '是真心的。（顿了顿）牢大，你知道你的名字在我心里变成了什么吗？' },
+        { speaker: '牢大', text: '（好奇地转回头）什么？' },
+        { speaker: '四眼', text: '（微笑）变成了一个动词。“牢大”——意思是你一出现，我的世界就自动变得明亮而温暖。' },
+        { speaker: '牢大', text: '（捂住脸）不行了不行了……四眼你今天是不是吃错药了？', action: 'shy' },
+        { speaker: '四眼', text: '（轻声笑）可能是因为今天阳光太好了。' },
+        { speaker: '旁白', text: '（远处传来隐约的钢琴声，是《致爱丽丝》的旋律）' },
+        { speaker: '牢大', text: '（忽然站直身体）啊！是音乐教室有人在练习。', action: 'surprised' },
+        { speaker: '四眼', text: '（仔细聆听）弹得真好。' },
+        { speaker: '牢大', text: '（随着旋律轻轻哼唱，手指在窗台上打着节拍）四眼，如果……我是说如果，文化祭的时候，我们除了“诗词咖啡厅”，还能一起表演什么就好了。', action: 'happy' },
+        { speaker: '四眼', text: '（想了想）你可以唱歌，我可以朗诵诗。' },
+        { speaker: '牢大', text: '（眼睛一亮）对哦！我可以唱刚才那首《风与云的对话》，你可以朗诵你写给我的诗……', action: 'happy' },
+        { speaker: '四眼', text: '（微微脸红）我写的诗……可能还不够好。', action: 'shy' },
+        { speaker: '牢大', text: '（认真地摇头）只要是你写的，每一句都是最好的。（忽然想到什么）对了！我们可以把表演放在“心声投递站”旁边，让来看演出的人也能参与写信……' },
+        { speaker: '四眼', text: '（被她的热情感染）还可以准备一些空白书签，让客人写下自己喜欢的一句话，我们可以帮他们做成压花书签。' },
+        { speaker: '牢大', text: '（兴奋地抓住他的手臂）好主意！四眼你好厉害！', action: 'happy' },
+        { speaker: '旁白', text: '（钟楼突然传来浑厚的钟声，一共六响。声音在走廊里回荡，层层叠叠）' },
+        { speaker: '牢大', text: '（闭上眼聆听）听……这就是我说的回音。' },
+        { speaker: '四眼', text: '（也闭上眼）像是有很多个钟声，从四面八方涌来。' },
+        { speaker: '牢大', text: '（在钟声中轻声说）如果时间能停在这一刻就好了。' },
+        { speaker: '四眼', text: '（睁开眼睛）为什么？' },
+        { speaker: '牢大', text: '（依然闭着眼）因为现在……我特别特别幸福。' },
+        { speaker: '四眼', text: '（看着她被夕阳染成蜜色的侧脸，心跳漏了一拍）牢大……' },
+        { speaker: '牢大', text: '（睁开眼，转头看他）嗯？' },
+        { speaker: '四眼', text: '（鼓起勇气）我可以……牵你的手吗？', action: 'shy' },
+        { speaker: '旁白', text: '（钟声的余韵还在空气中振动）' },
+        { speaker: '牢大', text: '（没有回答，只是轻轻将自己的手放在窗台上，手心朝上）', action: 'shy' },
+        { speaker: '四眼', text: '（深吸一口气，缓缓握住她的手。她的手温暖而柔软）' },
+        { speaker: '牢大', text: '（手指微微一动，然后坚定地回握）四眼的手……比想象中要大呢。' },
+        { speaker: '四眼', text: '（握得更紧一些）牢大的手……很温暖。' },
+        { speaker: '牢大', text: '（低头看着交握的手）这样……我们就算是正式牵过手了吧？' },
+        { speaker: '四眼', text: '（点头）嗯。' },
+        { speaker: '牢大', text: '（抬起头，笑容灿烂）那以后，我心情不好的时候，你都要像这样牵着我的手，带我来这里看夕阳。', action: 'happy' },
+        { speaker: '四眼', text: '不止心情不好的时候。（认真地说）每一天的夕阳，只要你想看，我都陪你。' },
+        { speaker: '牢大', text: '（将头轻轻靠在他肩上）四眼，你说……毕业之后，我们还会这样吗？' },
+        { speaker: '四眼', text: '（感受着肩头的重量）会的。高中、大学……（停顿）只要你还愿意牵着我的手。' },
+        { speaker: '牢大', text: '（轻声）那说好了哦。无论去哪里，都要一起看夕阳。' },
+        { speaker: '四眼', text: '嗯，说好了。' },
+        { speaker: '旁白', text: '（钢琴声再次响起，这次是《梦中的婚礼》的片段。夕阳将两人的影子融为一体，投在走廊的墙壁上）' },
+        { speaker: '牢大', text: '（忽然想起什么）啊！差点忘了正事。' },
+        { speaker: '四眼', text: '什么正事？' },
+        { speaker: '牢大', text: '（从书包里掏出一个小本子）看！这是我为“诗词咖啡厅”画的菜单设计草稿。' },
+        { speaker: '四眼', text: '（接过本子，惊讶地翻看）这些都是你画的？', action: 'surprised' },
+        { speaker: '牢大', text: '（凑近指给他看）嗯！我想把每种“诗饮”都配上插画。比如这杯“春风沉醉”，就画几片樱花花瓣落在茶杯里；这杯“星空夜曲”，就画茶杯里倒映着星星……', action: 'happy' },
+        { speaker: '四眼', text: '（一页页翻看，每一页都画得细致用心）好美。（抬头看她）你什么时候画的？' },
+        { speaker: '牢大', text: '（不好意思地笑了）每天晚上做完作业之后。想着能和你一起做点什么，就特别有动力。', action: 'shy' },
+        { speaker: '四眼', text: '（合上本子，郑重地握住她的手）谢谢。' },
+        { speaker: '牢大', text: '（摇头）我才要谢谢你。（看向窗外渐深的暮色）谢谢你让我知道，原来喜欢一个人，可以这么快乐。' },
+        { speaker: '四眼', text: '（轻声）我也是。' },
+        { speaker: '旁白', text: '（走廊的灯忽然亮起，暖黄色的灯光洒在他们身上）' },
+        { speaker: '牢大', text: '（惊讶）啊，已经这么晚了。', action: 'surprised' },
+        { speaker: '四眼', text: '（不舍地松开手）我送你回家吧。' },
+        { speaker: '牢大', text: '（点点头，又摇摇头）不过在这之前……（从口袋里掏出手机）我们拍张照好不好？纪念今天。' },
+        { speaker: '四眼', text: '（有些紧张）拍照？', action: 'shy' },
+        { speaker: '牢大', text: '（打开相机前置镜头）嗯！就拍我们牵着手，还有窗外的夕阳。（将手机举高）来，笑一个！' },
+        { speaker: '四眼', text: '（看着镜头，露出有些不自然的笑容）' },
+        { speaker: '牢大', text: '（按下快门）咔嚓。（查看照片）噗……四眼你笑得好僵硬。', action: 'happy' },
+        { speaker: '四眼', text: '（挠头）我不太会拍照……', action: 'shy' },
+        { speaker: '牢大', text: '（将手机递给他）那再拍一张，这次你别看镜头，看我就好。' },
+        { speaker: '四眼', text: '（接过手机）好。' },
+        { speaker: '旁白', text: '（牢大重新靠回窗边，夕阳为她镀上金边。四眼举起手机，看着镜头里的她，忽然明白了什么叫“美好的不真实”）' },
+        { speaker: '四眼', text: '（轻声）牢大。' },
+        { speaker: '牢大', text: '嗯？' },
+        { speaker: '四眼', text: '我喜欢你。' },
+        { speaker: '旁白', text: '（快门声响起，定格了少女错愕后绽放的灿烂笑容）' },
+        { speaker: '牢大', text: '（脸瞬间通红）你、你突然说什么啊！', action: 'shy' },
+        { speaker: '四眼', text: '（看着手机屏幕上的照片，微笑）因为觉得……这个时候说，你会永远记得。' },
+        { speaker: '牢大', text: '（抢过手机看照片，声音越来越小）太狡猾了……', action: 'shy' },
+        { speaker: '四眼', text: '（重新牵起她的手）走吧，送你回家。' },
+        { speaker: '牢大', text: '（握紧他的手，小声）那句话……再说一遍好不好？', action: 'shy' },
+        { speaker: '四眼', text: '（停下脚步，认真地看着她）我喜欢你，牢大。' },
+        { speaker: '牢大', text: '（眼眶微红）我也是。最喜欢四眼了。' },
+        { speaker: '旁白', text: '他们牵着手走出走廊，夕阳将影子拉得很长。墙上的宣传栏里，文化祭的海报刚刚贴出，上面画着茶杯和书本的图案。这个平凡的黄昏，在空荡的走廊里，两颗心找到了彼此的频率。' },
+
+        // 场景三：上层回廊 (图5)
+        { type: 'bg', bg: 'corridor2' },
+        { speaker: '旁白', text: '这里是教学楼上层的回廊。黑色的铁艺栏杆上，精致的叶片图案在夕阳下投出美丽的影子。栏杆后是白色的墙壁和米色瓷砖立柱，地面是干净的蓝色。远处可以看见葱郁的绿植，整个空间通透而安静，仿佛悬浮在时光之外。' },
+        { speaker: '牢大', text: '（小跑着登上最后一级台阶）这里这里！我最喜欢的地方！', action: 'happy' },
+        { speaker: '四眼', text: '（跟在后面，微微喘气）这是……连接两栋楼的空中走廊？' },
+        { speaker: '牢大', text: '（双手张开靠在栏杆上）没错！而且是全校视野最好的地方。（转身，背靠栏杆）你看，从这里能看到操场、钟楼，还有远处的山。' },
+        { speaker: '四眼', text: '（走到她身边，望向远方）真的……好高。' },
+        { speaker: '牢大', text: '（得意地笑）而且很少有人来哦。（指着栏杆上的花纹）你看这些叶子图案，每次阳光照过来，地上就会出现特别好看的光影。', action: 'happy' },
+        { speaker: '四眼', text: '（低头看着地上斑驳的光影）像蕾丝一样。' },
+        { speaker: '牢大', text: '（蹲下身，用手去够地上的光斑）对吧对吧！（抬头看他）四眼，你知道我为什么最喜欢这里吗？' },
+        { speaker: '四眼', text: '（也蹲下来）为什么？' },
+        { speaker: '牢大', text: '（用手指描绘光斑的形状）因为这里离天空特别近。（声音轻柔）不开心的时候，我会一个人来这里，对着天空说话，好像那些烦恼都会被云带走。' },
+        { speaker: '四眼', text: '（学着她的样子伸出手）那……今天要对天空说什么？' },
+        { speaker: '牢大', text: '（认真思考，然后双手合十）今天要说……“谢谢你把四眼带到我身边”。' },
+        { speaker: '四眼', text: '（手指微微颤抖）牢大……' },
+        { speaker: '牢大', text: '（睁开眼，笑容灿烂）到你了！你也对天空说句话。' },
+        { speaker: '四眼', text: '（学着她的样子双手合十，闭上眼睛）希望……牢大永远都能笑得这么开心。' },
+        { speaker: '牢大', text: '（静静看着他，眼眶微微发热）四眼，你太温柔了。', action: 'shy' },
+        { speaker: '四眼', text: '（睁开眼）因为是你教会我，温柔地对待世界是多么美好的事。' },
+        { speaker: '旁白', text: '（一阵风吹过，栏杆上的光影轻轻摇曳）' },
+        { speaker: '牢大', text: '（站起身，拍拍裙子）对了，给你看个东西！（从书包侧袋里掏出一个小望远镜）用这个看远处，特别清楚！', action: 'happy' },
+        { speaker: '四眼', text: '（惊讶）你还随身带望远镜？', action: 'surprised' },
+        { speaker: '牢大', text: '（调皮地眨眼）因为这里是“观测点”呀。（将望远镜递给他）看那边，操场边上的那棵大树。' },
+        { speaker: '四眼', text: '（接过望远镜，调整焦距）啊……看到了。树上有鸟巢。' },
+        { speaker: '牢大', text: '（凑近）对吧对吧！我上周发现里面有小鸟，这几天一直在观察它们。（语气兴奋）鸟妈妈每天都会飞来飞去地喂食。', action: 'happy' },
+        { speaker: '四眼', text: '（透过望远镜看着）它们看起来很幸福。' },
+        { speaker: '牢大', text: '（轻声）就像我们现在一样。' },
+        { speaker: '旁白', text: '（四眼放下望远镜，转头看她。夕阳正好从侧面照过来，在她的睫毛上洒下金色的光）' },
+        { speaker: '四眼', text: '牢大，我有没有说过……' },
+        { speaker: '牢大', text: '嗯？' },
+        { speaker: '四眼', text: '你认真看东西的样子，特别可爱。' },
+        { speaker: '牢大', text: '（脸一红，抢过望远镜）不准突然说这种话啦！（自己也举起望远镜）我要看看别的地方……啊！那边是图书馆的屋顶，有只猫在晒太阳！', action: 'shy' },
+        { speaker: '四眼', text: '（微笑看着她）哪里都有你发现的“小确幸”呢。' },
+        { speaker: '牢大', text: '（放下望远镜，认真地说）因为我觉得，世界上美好的东西太多了，要一个一个去发现、去记住。（看向他）和四眼一起记住。' },
+        { speaker: '四眼', text: '（从口袋里掏出一个小笔记本）其实……我今天开始写了。' },
+        { speaker: '牢大', text: '写什么？' },
+        { speaker: '四眼', text: '（翻开笔记本）每天为你写一句诗的约定。（将本子递给她）这是今天的第一句。' },
+        { speaker: '牢大', text: '（小心接过，轻声念出）“你指给我看的那片云，在我心里下了一场彩虹雨。”（抬起头）四眼……', action: 'shy' },
+        { speaker: '四眼', text: '（有些不好意思）写得不好……', action: 'shy' },
+        { speaker: '牢大', text: '（摇头，紧紧抱住笔记本）很好。（声音哽咽）好到我想把它裱起来挂在墙上。', action: 'happy' },
+        { speaker: '四眼', text: '（轻笑）这才第一句呢。（认真地说）我会一直写下去，写到我们毕业，写到我们长大，写到……写不动为止。' },
+        { speaker: '牢大', text: '（擦擦眼角）那我要全部收藏起来，等我们老了，就一起坐在摇椅上一页页翻看。' },
+        { speaker: '四眼', text: '（想象那个画面，微笑）好。' },
+        { speaker: '旁白', text: '（夕阳又下沉了一些，天空开始泛起橙红色）' },
+        { speaker: '牢大', text: '（重新靠在栏杆上）四眼，你说……十年后的我们，会在哪里呢？' },
+        { speaker: '四眼', text: '（站在她身边）可能还在这个城市，也可能去了很远的地方。（顿了顿）但无论在哪里，我一定还在为你写诗。' },
+        { speaker: '牢大', text: '（侧头看他）那如果……我变得不可爱了呢？' },
+        { speaker: '四眼', text: '（认真地摇头）在我眼里，你永远都是现在这个，会因为发现一只小猫而兴奋，会因为一首歌而感动，会为了别人的幸福而努力的笑容。' },
+        { speaker: '牢大', text: '（将头轻轻靠在他肩上）四眼，你知不知道……你是我见过最会说情话的“书呆子”。', action: 'shy' },
+        { speaker: '四眼', text: '（微笑）只对你说。' },
+        { speaker: '牢大', text: '（沉默片刻）文化祭……我们一定要办得特别好。' },
+        { speaker: '四眼', text: '嗯。' },
+        { speaker: '牢大', text: '让所有来“诗词咖啡厅”的人，都能感受到文字和心意的温度。' },
+        { speaker: '四眼', text: '好。' },
+        { speaker: '牢大', text: '还有“心声投递站”，要准备好多好多浅蓝色的信纸。' },
+        { speaker: '四眼', text: '我来准备。' },
+        { speaker: '牢大', text: '（抬起头，眼睛亮晶晶的）表演的时候，你要穿得正式一点哦。', action: 'happy' },
+        { speaker: '四眼', text: '（低头看了看自己的校服）这样不行吗？' },
+        { speaker: '牢大', text: '（笑）至少要扣好所有扣子。（伸手帮他整理衣领）领子也要翻好。' },
+        { speaker: '四眼', text: '（乖乖站着让她整理）牢大。' },
+        { speaker: '牢大', text: '嗯？' },
+        { speaker: '四眼', text: '谢谢你。' },
+        { speaker: '牢大', text: '（停下动作）突然谢什么？' },
+        { speaker: '四眼', text: '（看着她）谢谢你愿意走进我的世界，让原本只有书和诗的生活，变得如此鲜活。' },
+        { speaker: '牢大', text: '（眼眶又红了）你才是……谢谢你愿意牵起我的手，带我看这么多美丽的风景。', action: 'shy' },
+        { speaker: '旁白', text: '（两人相视而笑，夕阳将他们的影子在蓝色地面上拉得很长很长）' },
+        { speaker: '牢大', text: '（忽然想起什么）对了！闭上眼睛，再给你一个东西。' },
+        { speaker: '四眼', text: '（顺从地闭上眼睛）这次又是什么？' },
+        { speaker: '牢大', text: '（从书包里拿出一个小布袋）可以睁开了。' },
+        { speaker: '四眼', text: '（睁开眼，接过布袋）这是……', action: 'surprised' },
+        { speaker: '牢大', text: '（期待地看着他）打开看看。' },
+        { speaker: '旁白', text: '（四眼打开布袋，里面是一个手工做的钥匙扣，上面挂着一个小小的心形木牌，木牌一面刻着“诗”，一面刻着“歌”）' },
+        { speaker: '四眼', text: '（小心地拿起钥匙扣）这是……', action: 'surprised' },
+        { speaker: '牢大', text: '（有些不好意思）我自己刻的。（指着木牌）“诗”是你，“歌”是我。（声音越来越小）希望我们能像诗和歌一样，永远在一起。', action: 'shy' },
+        { speaker: '四眼', text: '（将钥匙扣紧紧握在手心）我会一直带在身边。' },
+        { speaker: '牢大', text: '（又从口袋里掏出一个同款的）我也有一个。（展示给他看）这样我们就是一对啦。' },
+        { speaker: '四眼', text: '（看着两个一模一样的钥匙扣，心中涌起暖流）牢大……' },
+        { speaker: '牢大', text: '（将钥匙扣挂在自己的书包上）以后无论去哪里，只要看到这个，就会想起对方。' },
+        { speaker: '四眼', text: '（也郑重地将钥匙扣挂好）嗯。' },
+        { speaker: '旁白', text: '（天空的橙红色渐渐加深，云朵镶上了金边）' },
+        { speaker: '牢大', text: '（看着远方）四眼，你说星星出来之后，这里能看到很多吗？' },
+        { speaker: '四眼', text: '（抬头看看天空）应该可以。这里光污染少。' },
+        { speaker: '牢大', text: '（兴奋地转身）那我们改天晚上来好不好？带着毯子和热饮，一起看星星。', action: 'happy' },
+        { speaker: '四眼', text: '（想象那个画面，微笑）好。我还可以带诗集来，念给你听。' },
+        { speaker: '牢大', text: '（拍手）那说定了！等天气好的晚上，我们一起逃掉晚自习来这里！', action: 'happy' },
+        { speaker: '四眼', text: '（惊讶）逃课？', action: 'surprised' },
+        { speaker: '牢大', text: '（吐吐舌头）偶尔一次嘛。（眼睛一转）而且我们可以说是来为文化祭采风！' },
+        { speaker: '四眼', text: '（无奈地笑）这个理由……' },
+        { speaker: '牢大', text: '（抓住他的手臂摇晃）好不好嘛？就一次！', action: 'happy' },
+        { speaker: '四眼', text: '（看着她期待的眼神，终于点头）好，就一次。' },
+        { speaker: '牢大', text: '（开心地跳起来）太好啦！（忽然想到）啊！还要带那个MP3，我们可以一起听歌。', action: 'happy' },
+        { speaker: '四眼', text: '（从口袋里掏出MP3）我每天都带着。' },
+        { speaker: '牢大', text: '（惊讶）真的？', action: 'surprised' },
+        { speaker: '四眼', text: '（点头）每天上学路上、放学路上，都在听。（微笑）感觉你就在身边。' },
+        { speaker: '牢大', text: '（感动得说不出话，只是紧紧握住他的手）', action: 'shy' },
+        { speaker: '四眼', text: '（回握她的手）所以，不用等到看星星的时候。（递过一只耳机）现在就可以一起听。' },
+        { speaker: '牢大', text: '（接过耳机戴上）嗯！' },
+        { speaker: '旁白', text: '（音乐响起，是那首《风与云的对话》。两人并肩靠在栏杆上，共享着同一段旋律）' },
+        { speaker: '牢大', text: '（随着音乐轻轻哼唱）四眼。', action: 'happy' },
+        { speaker: '四眼', text: '嗯？' },
+        { speaker: '牢大', text: '这辈子……我可能都离不开你了。' },
+        { speaker: '四眼', text: '（握紧她的手）那就不要离开。' },
+        { speaker: '牢大', text: '（将头靠在他肩上）万一……万一以后我们吵架了呢？' },
+        { speaker: '四眼', text: '（认真思考）那我就写一首道歉的诗，折成纸飞机，从你家窗口飞进去。' },
+        { speaker: '牢大', text: '（笑出声）那我要是还生气呢？', action: 'happy' },
+        { speaker: '四眼', text: '就写第二首、第三首……直到你消气为止。' },
+        { speaker: '牢大', text: '（抬头看他）那如果是我错了呢？' },
+        { speaker: '四眼', text: '（微笑）那你就唱首歌给我听。什么歌都可以。' },
+        { speaker: '牢大', text: '（眼眶湿润）四眼，你太宠我了。', action: 'shy' },
+        { speaker: '四眼', text: '（轻轻拥住她）因为是你。' },
+        { speaker: '旁白', text: '（夕阳终于沉入远山，天空开始出现第一颗星星）' },
+        { speaker: '旁白', text: '铁艺栏杆上的光影渐渐消失，取而代之的是远处教室亮起的点点灯光。两个少年少女的身影在暮色中依偎，像一幅静谧的画。钥匙扣在书包上轻轻碰撞，发出细微的声响，仿佛在为他们的约定作证。这个黄昏，在离天空最近的地方，许下的每一个诺言，都会变成未来的星光。' },
+
+        // 场景四：操场白天 (图6，前半部分)
+        { type: 'bg', bg: 'playground' },
+        { speaker: '旁白', text: '文化祭前一周的周末，校园里人迹罕至。棕红色的跑道环绕着茵茵绿草，白色线条在夕阳下格外清晰。远处那栋米黄色建筑静静矗立，顶部的塔楼在灰白色天空下显得肃穆。草坪尽头的树木郁郁葱葱，整个操场空旷而宁静，只有风吹过草叶的沙沙声。' },
+        { speaker: '牢大', text: '（伸直双腿坐在跑道边的树荫下，黑色休闲鞋的白色鞋头轻轻晃动）周末的学校果然不一样呢，安静得像整个世界只有我们两个人。' },
+        { speaker: '四眼', text: '（靠坐在树干旁，手里翻着诗集）嗯，连风都变得温柔了。' },
+        { speaker: '牢大', text: '（从书包里掏出两个便当盒）锵锵！我做了便当哦！', action: 'happy' },
+        { speaker: '四眼', text: '（惊讶地抬头）你还会做饭？', action: 'surprised' },
+        { speaker: '牢大', text: '（得意地打开便当盒）当然！看，这是饭团，这是玉子烧，这是小香肠……（声音突然变小）不过可能不太好看……', action: 'shy' },
+        { speaker: '四眼', text: '（看着便当盒里略显笨拙但用心摆好的食物）很漂亮。（拿起一个饭团）这个……是兔子形状？' },
+        { speaker: '牢大', text: '（脸红）是、是啊！（凑近）你看，这里是耳朵……', action: 'shy' },
+        { speaker: '四眼', text: '（仔细端详）很可爱。（小心地咬了一口）好吃。' },
+        { speaker: '牢大', text: '（眼睛亮起来）真的？', action: 'happy' },
+        { speaker: '四眼', text: '（点头）比我妈妈做的还好吃。' },
+        { speaker: '牢大', text: '（开心地晃了晃腿）那以后经常做给你吃！（打开自己的便当盒）我也开动啦！', action: 'happy' },
+        { speaker: '旁白', text: '（两人并肩坐着吃便当，远处偶尔传来几声鸟鸣）' },
+        { speaker: '牢大', text: '（咽下一口饭团）四眼，文化祭的准备进展怎么样？' },
+        { speaker: '四眼', text: '（从书包里拿出一叠浅蓝色信纸）信纸和信封都准备好了。（展示给她看）选了三种不同的蓝色，从浅到深。' },
+        { speaker: '牢大', text: '（接过信纸，手指轻抚纸面）好漂亮……摸起来也很舒服。（抬头）诗呢？你选好要用的诗了吗？' },
+        { speaker: '四眼', text: '（又拿出一个笔记本）选了三十首。（翻开）有古典的，也有现代的。每一首都和“心意”有关。' },
+        { speaker: '牢大', text: '（凑过去看）哇……你都做了注解。（指着其中一行）“此情可待成追忆，只是当时已惘然”……这句会不会太伤感了？', action: 'surprised' },
+        { speaker: '四眼', text: '（微笑）所以我准备在旁边画个小太阳。（拿起笔在页边画了一个简笔画太阳）这样就会温暖起来。' },
+        { speaker: '牢大', text: '（看着他认真的侧脸）四眼，你真的很适合做这个。' },
+        { speaker: '四眼', text: '（抬头）什么？' },
+        { speaker: '牢大', text: '把美好的东西传递给别人。（轻声）你有一种能力，能让文字变得有温度。' },
+        { speaker: '四眼', text: '（有些不好意思）是因为……我想把和你在一起时感受到的温暖，也传递给别人。', action: 'shy' },
+        { speaker: '牢大', text: '（放下便当盒，轻轻靠在他肩上）四眼，有时候我会想，我们能相遇，真的是奇迹。' },
+        { speaker: '四眼', text: '（放下笔记本，让她靠得更舒服些）不是奇迹。' },
+        { speaker: '牢大', text: '嗯？' },
+        { speaker: '四眼', text: '是必然。（看向远方的塔楼）就像春天花一定会开，秋天叶一定会落一样，我们相遇，是必然会发生的事。' },
+        { speaker: '牢大', text: '（闭上眼睛）那……我们一直在一起，也是必然吗？' },
+        { speaker: '四眼', text: '（坚定地）嗯。是必然。' },
+        { speaker: '旁白', text: '（一阵风吹过，草坪泛起波浪）' },
+        { speaker: '牢大', text: '（坐直身体）对了！给你看个东西！（从书包里掏出一个画本）这是我为“诗词咖啡厅”画的装饰草图。', action: 'happy' },
+        { speaker: '四眼', text: '（接过画本，一页页翻看）这些是……', action: 'surprised' },
+        { speaker: '牢大', text: '（兴奋地指着）这是入口的招牌，用树枝和干花做的；这是桌布的设计，印着诗句的片段；这是墙上的装饰，用浅蓝色丝带挂起客人们写的书签……', action: 'happy' },
+        { speaker: '四眼', text: '（仔细看着每一页）好用心。（指着其中一页）这个角落是？' },
+        { speaker: '牢大', text: '（脸微红）是……我们的特别角落。只属于“店长”和“首席服务生”的休息区。', action: 'shy' },
+        { speaker: '四眼', text: '（看着设计图上两个并排的椅子，中间画着一颗小小的心，微笑）我很喜欢。' },
+        { speaker: '牢大', text: '（抢回画本）还、还没完成呢！（小心地收好）等全部画完再给你看。', action: 'shy' },
+        { speaker: '四眼', text: '（从口袋里掏出MP3）要听歌吗？' },
+        { speaker: '牢大', text: '（点头，自然地接过一只耳机）嗯。' },
+        { speaker: '旁白', text: '（音乐响起，是轻快的吉他曲）' },
+        { speaker: '牢大', text: '（随着节奏轻轻晃动身体）这首是我最近的最爱。', action: 'happy' },
+        { speaker: '四眼', text: '（闭上眼睛）像雨后的清晨。' },
+        { speaker: '牢大', text: '（微笑）对吧？每次听都觉得心情会变好。（忽然想起）啊！四眼，你有为文化祭写新的诗吗？' },
+        { speaker: '四眼', text: '（睁开眼睛，从诗集里抽出一张浅蓝色信纸）其实……写了一首。' },
+        { speaker: '牢大', text: '（期待地看着他）念给我听好不好？', action: 'happy' },
+        { speaker: '四眼', text: '（有些紧张地清了清嗓子）' },
+        { speaker: '四眼', text: '“在堆满彩色书本的课桌之间，\n在蓝色窗帘滤过的光晕里面，\n在所有平凡无奇的午后三点，\n你是我最盛大的庆典。\n当钟声在空旷走廊渐渐飘远，\n当铁艺栏杆投下叶影的弧线，\n在所有无人知晓的秘密地点，\n你是我最勇敢的探险。\n如果词语能够编织成冠冕，\n我要为你加冕，在众人面前，\n说你是诗篇里最亮的音节，\n是青春这本仓促的书里，\n我反复标注的重点。”' },
+        { speaker: '旁白', text: '（念完后，操场陷入短暂的寂静）' },
+        { speaker: '牢大', text: '（久久没有说话，只是看着他）', action: 'surprised' },
+        { speaker: '四眼', text: '（紧张地）是不是……太直白了？', action: 'shy' },
+        { speaker: '牢大', text: '（摇摇头，眼泪毫无预兆地掉下来）四眼……', action: 'shy' },
+        { speaker: '四眼', text: '（慌乱地）对不起！我、我不是故意要惹你哭……', action: 'shy' },
+        { speaker: '牢大', text: '（擦掉眼泪，却笑出声）笨蛋，我是太高兴了。（接过信纸，小心地抚平）这首诗……可以给我吗？', action: 'happy' },
+        { speaker: '四眼', text: '（点头）本来就是为你写的。' },
+        { speaker: '牢大', text: '（将信纸仔细折好，放进贴身的衣袋）我要一直带着。（抬头看他）文化祭那天，我可以把这首诗念出来吗？在我们的表演环节。', action: 'happy' },
+        { speaker: '四眼', text: '（惊讶）你要念？', action: 'surprised' },
+        { speaker: '牢大', text: '（坚定地点头）嗯。我要让所有人都知道，这首诗是写给我的。（脸红）也、也想让所有人都知道……我们在一起。', action: 'shy' },
+        { speaker: '四眼', text: '（心中涌起暖流）好。' },
+        { speaker: '牢大', text: '（重新靠回他肩上）四眼，你说……十年后的文化祭，我们会在哪里？' },
+        { speaker: '四眼', text: '（思考片刻）也许已经毕业了，在不同的城市。（顿了顿）但每年的这一天，我们都会回到这里，在操场边坐一会儿。' },
+        { speaker: '牢大', text: '（想象那个画面）然后我会说：“还记得吗？当年我们在这里吃便当，你念了一首让我哭的诗。”', action: 'happy' },
+        { speaker: '四眼', text: '（微笑）我会说：“记得。那首诗我现在还能背出来。”' },
+        { speaker: '牢大', text: '（坐直身体，认真地看着他）那我们约定，十年后的今天，无论我们在哪里，都要回到这里。' },
+        { speaker: '四眼', text: '（伸出小指）约定。' },
+        { speaker: '牢大', text: '（勾住他的小指）约定！' },
+
+        // 场景五：黄昏操场 (新增背景 playground2)
+        { type: 'bg', bg: 'playground2' },
+        { speaker: '旁白', text: '（夕阳开始下沉，天空染上橙红色）' },
+        { speaker: '牢大', text: '（忽然站起来）四眼，我们来跑步吧！', action: 'happy' },
+        { speaker: '四眼', text: '（愣住）跑步？', action: 'surprised' },
+        { speaker: '牢大', text: '（拉起他）嗯！沿着跑道，跑到那棵大树再跑回来！（眼睛亮晶晶的）看谁先到！', action: 'happy' },
+        { speaker: '四眼', text: '（看着远处的树）有点远哦。' },
+        { speaker: '牢大', text: '（已经开始热身）怕了吗？', action: 'happy' },
+        { speaker: '四眼', text: '（也站起来）怎么会。（微笑）不过输的人要答应赢的人一个要求。' },
+        { speaker: '牢大', text: '（歪头）什么要求都可以？', action: 'happy' },
+        { speaker: '四眼', text: '（点头）什么都可以。' },
+        { speaker: '牢大', text: '（露出狡黠的笑）那说定了！预备——跑！', action: 'happy' },
+        { speaker: '旁白', text: '（两人沿着红色跑道向前奔跑，风扬起他们的头发和衣角）' },
+        { speaker: '牢大', text: '（边跑边笑）四眼你跑得好慢！', action: 'happy' },
+        { speaker: '四眼', text: '（努力跟上）是你太快了……' },
+        { speaker: '旁白', text: '（最终牢大先一步跑到大树下，转身对四眼张开双臂）' },
+        { speaker: '牢大', text: '（气喘吁吁但笑容灿烂）我赢了！', action: 'happy' },
+        { speaker: '四眼', text: '（停在她面前，也喘着气）嗯……你赢了。想要什么？' },
+        { speaker: '牢大', text: '（眼睛转了转）我要你……背我回去。', action: 'happy' },
+        { speaker: '四眼', text: '（愣住）诶？', action: 'surprised' },
+        { speaker: '牢大', text: '（张开手臂）刚才说好的，什么要求都可以！', action: 'happy' },
+        { speaker: '四眼', text: '（无奈地笑着转过身）上来吧。' },
+        { speaker: '旁白', text: '（牢大开心地跳上他的背，双手环住他的脖子）' },
+        { speaker: '牢大', text: '（在他耳边轻声）重吗？' },
+        { speaker: '四眼', text: '（稳步走着）不重。（停顿）像背着一片云。' },
+        { speaker: '牢大', text: '（把脸靠在他背上）四眼，你的背好温暖。' },
+        { speaker: '四眼', text: '（微笑）因为背着你。' },
+        { speaker: '旁白', text: '（夕阳将他们的影子投在跑道上，拉得很长很长。背上的少女哼着歌，少年走得很稳）' },
+        { speaker: '牢大', text: '（忽然说）四眼，我改变主意了。' },
+        { speaker: '四眼', text: '嗯？' },
+        { speaker: '牢大', text: '刚才的要求不算。我真正想要的是……' },
+        { speaker: '四眼', text: '是什么？' },
+        { speaker: '牢大', text: '（声音很轻）十年后，二十年后，三十年后……每年的今天，你都要这样背我一次。' },
+        { speaker: '四眼', text: '（停下脚步）' },
+        { speaker: '牢大', text: '（紧张地）不行吗？', action: 'shy' },
+        { speaker: '四眼', text: '（将她往上托了托，继续往前走）好。无论多少年，只要你愿意，我就背着你。' },
+        { speaker: '牢大', text: '（收紧手臂）那说定了。' },
+        { speaker: '四眼', text: '说定了。' },
+        { speaker: '旁白', text: '（他们回到原来的树荫下。四眼小心地放下牢大）' },
+        { speaker: '牢大', text: '（坐在草地上，抬头看他）四眼，我还有个问题。' },
+        { speaker: '四眼', text: '（在她身边坐下）嗯？' },
+        { speaker: '牢大', text: '如果……我是说如果，以后我们吵架了，谁会先道歉？' },
+        { speaker: '四眼', text: '（认真思考）我会。' },
+        { speaker: '牢大', text: '为什么？' },
+        { speaker: '四眼', text: '因为比起对错，我更害怕你难过。' },
+        { speaker: '牢大', text: '（眼眶又红了）那如果是我错得很离谱呢？', action: 'shy' },
+        { speaker: '四眼', text: '（微笑）那我会写一首诗，告诉你即使错了也没关系。然后等你准备好了，我们再一起解决问题。' },
+        { speaker: '牢大', text: '（扑进他怀里）四眼……你太好了，好得不真实。', action: 'happy' },
+        { speaker: '四眼', text: '（轻轻抱住她）都是因为你，我才能变成这样。' },
+        { speaker: '旁白', text: '（夕阳完全沉入地平线，天空变成深蓝色，第一颗星星亮起）' },
+        { speaker: '牢大', text: '（从他怀里抬起头）看，星星出来了。' },
+        { speaker: '四眼', text: '（仰望星空）嗯。' },
+        { speaker: '牢大', text: '（数着星星）一颗、两颗……四眼，你说星星看得见我们吗？' },
+        { speaker: '四眼', text: '（低头看她）也许看得见。' },
+        { speaker: '牢大', text: '（认真地对天空挥手）那你们要作证哦！我和四眼约好了，要一直一直在一起！', action: 'happy' },
+        { speaker: '四眼', text: '（也抬头对星空说）请你们作证。' },
+        { speaker: '牢大', text: '（重新靠回他肩上）四眼，我有没有说过……' },
+        { speaker: '四眼', text: '嗯？' },
+        { speaker: '牢大', text: '遇到你，是我这辈子最幸运的事。' },
+        { speaker: '四眼', text: '（握紧她的手）这句话应该我说。（停顿）牢大，谢谢你出现在我的生命里。' },
+        { speaker: '牢大', text: '（闭上眼睛）那……我们就这样坐到很晚好不好？' },
+        { speaker: '四眼', text: '好。' },
+        { speaker: '牢大', text: '然后一起看星星越来越多。' },
+        { speaker: '四眼', text: '好。' },
+        { speaker: '牢大', text: '然后等月亮出来。' },
+        { speaker: '四眼', text: '好。' },
+        { speaker: '牢大', text: '然后……永远不分开。' },
+        { speaker: '四眼', text: '（将她搂得更紧）好。' },
+        { speaker: '旁白', text: '操场边的路灯一盏盏亮起，在红色跑道上投下温暖的光圈。远处塔楼的轮廓渐渐模糊在暮色中，只有顶端的红旗还在轻轻飘扬。两个少年少女的身影依偎在树荫下，像两株刚刚开始生长的树，根须在看不见的地方悄悄缠绕。他们的对话如同星空下悄悄盛开的花，一朵接一朵，每一朵都诉说着同样的心意——从今往后，每个平凡的日子，都将因为彼此的存在，变成永恒的诗篇。' },
+
+        // 场景六：片尾黑幕
+
+                { type: 'end' }
+            ];
+            
+            // ========== 资源映射 ==========
+            const resources = {
+                bg: {
+                    'classroom': { img: './img/bg_classroom.jpg', music: './music/classroom.mp3' },
+                    'corridor1': { img: './img/bg_corridor1.jpg', music: './music/corridor1.mp3' },
+                    'corridor2': { img: './img/bg_corridor2.jpg', music: './music/corridor2.mp3' },
+                    'playground': { img: './img/bg_playground.jpg', music: './music/playground.mp3' },
+                    'playground2': { img: './img/bg_playground2.jpg', music: './music/playground.mp3' },
+                    'end': { img: '', music: './music/end.mp3' }
+                },
+                characters: {
+                    '四眼': './img/boy.png',
+                    '牢大': './img/girl.png'
+                }
+            };
+            
+            // ========== 核心功能函数 ==========
+            function changeBackground(bgKey) {
+                const bgRes = resources.bg[bgKey] || resources.bg['classroom'];
+                currentBg = bgKey;
+                
+                // 设置背景图片
+                if (bgRes.img) {
+                    elements.bgImage.style.backgroundImage = `url('${bgRes.img}')`;
+                }
+                
+                // 播放音乐（相同音乐不重启）
+                playMusic(bgRes.music);
+                
+                // 设置角色图片
+                elements.charLeft.src = resources.characters['四眼'];
+                elements.charRight.src = resources.characters['牢大'];
+                elements.charLeft.style.opacity = '0.4';
+                elements.charRight.style.opacity = '0.4';
+            }
+            
+            function playMusic(musicPath) {
+                // 如果当前音乐与新音乐相同，不重启
+                if (currentMusicPath === musicPath && currentAudio && !currentAudio.paused) {
+                    return;
+                }
+                
+                // 停止当前音乐
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                }
+                
+                // 播放新音乐
+                if (musicPath) {
+                    currentAudio = new Audio(musicPath);
+                    currentAudio.loop = true;
+                    currentAudio.volume = parseFloat(elements.volumeSlider.value);
+                    currentAudio.play().catch(e => {
+                        console.log('音乐自动播放可能需要用户交互');
+                    });
+                    currentMusicPath = musicPath;
+                    elements.musicPlayPause.textContent = '⏸️';
+                }
+            }
+            
+            function updateCharacters(speaker) {
+                // 重置所有样式
+                elements.charLeft.classList.remove('shake', 'bounce', 'wobble');
+                elements.charRight.classList.remove('shake', 'bounce', 'wobble');
+                
+                // 设置角色透明度
+                if (speaker === '四眼') {
+                    elements.charLeft.style.opacity = '1';
+                    elements.charRight.style.opacity = '0.4';
+                } else if (speaker === '牢大') {
+                    elements.charLeft.style.opacity = '0.4';
+                    elements.charRight.style.opacity = '1';
+                } else {
+                    // 旁白
+                    elements.charLeft.style.opacity = '0.4';
+                    elements.charRight.style.opacity = '0.4';
+                }
+            }
+            
+            function displayCurrent() {
+                if (currentIndex >= messages.length) {
+                    showEnding();
+                    return;
+                }
+                
+                const msg = messages[currentIndex];
+                
+                if (msg.type === 'bg') {
+                    changeBackground(msg.bg);
+                    currentIndex++;
+                    displayCurrent();
+                    return;
+                }
+                
+                if (msg.type === 'end') {
+                    showEnding();
+                    return;
+                }
+                
+                // 更新对话框内容
+                elements.speakerName.textContent = msg.speaker || '旁白';
+                elements.messageText.textContent = msg.text || '';
+                
+                // 更新角色显示
+                updateCharacters(msg.speaker);
+                
+                // 添加到历史记录
+                historyMessages.push({
+                    speaker: msg.speaker || '旁白',
+                    text: msg.text || '',
+                    index: currentIndex
+                });
+                
+                renderHistory();
+            }
+            
+            function showEnding() {
+                elements.dialogBox.style.display = 'none';
+                elements.creditsContainer.classList.add('show');
+                
+                // 播放片尾音乐
+                if (resources.bg.end && resources.bg.end.music) {
+                    playMusic(resources.bg.end.music);
+                }
+                
+                elements.gameContainer.querySelector('.top-controls').style.opacity = '0.2';
+            }
+            
+            function resetGame() {
+                currentIndex = 0;
+                historyMessages = [];
+                fastForwardActive = false;
+                
+                if (fastForwardTimer) {
+                    clearInterval(fastForwardTimer);
+                    fastForwardTimer = null;
+                }
+                
+                elements.fastForwardBtn.textContent = '⏩';
+                elements.creditsContainer.classList.remove('show');
+                elements.dialogBox.style.display = 'block';
+                elements.gameContainer.querySelector('.top-controls').style.opacity = '1';
+                
+                changeBackground('classroom');
+                displayCurrent();
+            }
+            
+            function goNext() {
+                if (fastForwardActive) {
+                    clearInterval(fastForwardTimer);
+                    fastForwardTimer = null;
+                    fastForwardActive = false;
+                    elements.fastForwardBtn.textContent = '⏩';
+                }
+                
+                if (currentIndex < messages.length) {
+                    currentIndex++;
+                    displayCurrent();
+                }
+            }
+            
+            function toggleFastForward() {
+                if (fastForwardActive) {
+                    clearInterval(fastForwardTimer);
+                    fastForwardTimer = null;
+                    fastForwardActive = false;
+                    elements.fastForwardBtn.textContent = '⏩';
+                } else {
+                    if (currentIndex >= messages.length) return;
+                    fastForwardActive = true;
+                    elements.fastForwardBtn.textContent = '⏸️';
+                    fastForwardTimer = setInterval(() => {
+                        if (currentIndex < messages.length) {
+                            currentIndex++;
+                            displayCurrent();
+                        } else {
+                            toggleFastForward();
+                        }
+                    }, 100);
+                }
+            }
+            
+            function renderHistory() {
+                elements.historyList.innerHTML = '';
+                
+                if (historyMessages.length === 0) {
+                    elements.historyList.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px;">暂无历史记录</div>';
+                    return;
+                }
+                
+                historyMessages.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'history-item';
+                    div.innerHTML = `
+                        <span class="history-speaker">${item.speaker}</span>
+                        <span class="history-text">${item.text.substring(0, 25)}${item.text.length > 25 ? '...' : ''}</span>
+                    `;
+                    div.addEventListener('click', () => {
+                        currentIndex = item.index;
+                        displayCurrent();
+                        elements.historyPanel.classList.remove('show');
+                    });
+                    elements.historyList.appendChild(div);
+                });
+            }
+            
+            // ========== 事件绑定 ==========
+            function initEvents() {
+                // 对话框点击
+                elements.dialogBox.addEventListener('click', goNext);
+                
+                // 下一句按钮
+                elements.nextBtnSmall.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    goNext();
+                });
+                
+                // 重置按钮
+                elements.resetBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (confirm('确定要重置游戏吗？')) {
+                        resetGame();
+                    }
+                });
+                
+                // 历史按钮
+                elements.historyBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    elements.historyPanel.classList.toggle('show');
+                });
+                
+                // 快进按钮
+                elements.fastForwardBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleFastForward();
+                });
+                
+                // 音乐控制
+                elements.musicPlayPause.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (currentAudio && !currentAudio.paused) {
+                        currentAudio.pause();
+                        elements.musicPlayPause.textContent = '▶️';
+                    } else if (currentAudio) {
+                        currentAudio.play();
+                        elements.musicPlayPause.textContent = '⏸️';
+                    }
+                });
+                
+                // 音量控制
+                elements.volumeSlider.addEventListener('input', (e) => {
+                    const volume = parseFloat(e.target.value);
+                    if (currentAudio) {
+                        currentAudio.volume = volume;
+                    }
+                });
+                
+                // 关闭历史面板
+                elements.closeHistory.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    elements.historyPanel.classList.remove('show');
+                });
+                
+                // 点击外部关闭历史面板
+                document.addEventListener('click', (e) => {
+                    if (elements.historyPanel.classList.contains('show') && 
+                        !elements.historyPanel.contains(e.target) && 
+                        e.target !== elements.historyBtn) {
+                        elements.historyPanel.classList.remove('show');
+                    }
+                });
+                
+                // 键盘控制
+                document.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space' || e.code === 'ArrowRight' || e.code === 'Enter') {
+                        e.preventDefault();
+                        goNext();
+                    }
+                    if (e.code === 'Escape') {
+                        elements.historyPanel.classList.remove('show');
+                    }
+                });
+            }
+            
+            // ========== 初始化 ==========
+            function init() {
+                console.log('游戏初始化...');
+                
+                // 绑定事件
+                initEvents();
+                
+                // 初始化显示
+                changeBackground('classroom');
+                
+                // 确保角色图片显示
+                elements.charLeft.src = resources.characters['四眼'];
+                elements.charRight.src = resources.characters['牢大'];
+                
+                // 显示第一句
+                setTimeout(() => {
+                    displayCurrent();
+                    console.log('游戏初始化完成');
+                }, 100);
+            }
+            
+            // 页面加载完成后初始化
+            document.addEventListener('DOMContentLoaded', init);
+            
+        })();
+    </script>
+</body>
+</html>
